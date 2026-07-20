@@ -1,0 +1,6 @@
+.env
+*.secret.yml
+*.secret.yaml
+
+code/*
+!code/.gitkeep
