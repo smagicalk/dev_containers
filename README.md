@@ -57,11 +57,19 @@ docker compose up -d --force-recreate
 
 ## Kubernetes
 
-配置位于 `k8s/`。默认使用节点本地目录：
+Deployment 和 Service 已合并到：
+
+```text
+k8s/dev-containers.yml
+```
+
+默认代码目录映射为：
 
 ```text
 节点 /opt/dev_containers/code → Pod /workspace
 ```
+
+`hostPath.path` 是 Kubernetes 节点上的真实目录，`DirectoryOrCreate` 表示目录不存在时由 kubelet 自动创建。Pod 内通过同名 volume `code` 将它挂载到 `/workspace`。该数据保存在运行 Pod 的节点上，不会随 Pod 删除，但 Pod 调度到其他节点时会使用另一个节点上的目录。
 
 先创建 SSH 密码 Secret：
 
@@ -85,7 +93,7 @@ kubectl patch serviceaccount default \
 部署：
 
 ```bash
-kubectl apply -k k8s
+kubectl apply -f k8s/dev-containers.yml
 kubectl rollout status deployment/dev-containers
 kubectl get pod -l app.kubernetes.io/name=dev-containers
 ```
@@ -105,11 +113,11 @@ ssh -p 2222 root@127.0.0.1
 删除部署：
 
 ```bash
-kubectl delete -k k8s
+kubectl delete -f k8s/dev-containers.yml
 kubectl delete secret dev-containers-ssh ghcr-credentials
 ```
 
-`hostPath` 适用于单节点或固定节点环境。在多节点集群中，建议将 `k8s/deployment.yml` 的 `hostPath` 替换为 PVC。
+`hostPath` 适用于单节点或固定节点环境。在多节点集群中，建议将 `hostPath` 替换为 PVC。
 
 ## 安全提示
 

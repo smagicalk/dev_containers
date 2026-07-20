@@ -48,3 +48,19 @@ spec:
           hostPath:
             path: /opt/dev_containers/code
             type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dev-containers
+  labels:
+    app.kubernetes.io/name: dev-containers
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: dev-containers
+  ports:
+    - name: ssh
+      port: 22
+      targetPort: ssh
+      protocol: TCP
