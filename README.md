@@ -57,37 +57,23 @@ docker compose up -d --force-recreate
 
 ## Kubernetes
 
-Deployment 和 Service 已合并到：
+所有 Kubernetes 资源已合并到：
 
 ```text
 k8s/dev-containers.yml
 ```
 
-默认代码目录映射为：
+配置包含：
+
+- `PersistentVolume`：使用节点目录 `/opt/dev_containers/code`；
+- `PersistentVolumeClaim`：申请 `20Gi` 的 `ReadWriteOnce` 存储；
+- `Deployment`：运行 `dev_containers` 容器；
+- `Service`：使用 `LoadBalancer` 对外暴露 SSH 的 `50022` 端口。
+
+代码目录映射为：
 
 ```text
-节点 /opt/dev_containers/code → Pod /workspace
-```
-
-`hostPath.path` 是 Kubernetes 节点上的真实目录，`DirectoryOrCreate` 表示目录不存在时由 kubelet 自动创建。Pod 内通过同名 volume `code` 将它挂载到 `/workspace`。该数据保存在运行 Pod 的节点上，不会随 Pod 删除，但 Pod 调度到其他节点时会使用另一个节点上的目录。
-
-先创建 SSH 密码 Secret：
-
-```bash
-kubectl create secret generic dev-containers-ssh \
-  --from-literal=password="$(openssl rand -base64 24)"
-```
-
-如果 GHCR Package 是 private，再创建拉取凭据并绑定到当前 namespace 的默认 ServiceAccount：
-
-```bash
-kubectl create secret docker-registry ghcr-credentials \
-  --docker-server=ghcr.io \
-  --docker-username=smagicalk \
-  --docker-password="$GHCR_TOKEN"
-
-kubectl patch serviceaccount default \
-  -p '{"imagePullSecrets":[{"name":"ghcr-credentials"}]}'
+Kubernetes 节点 /opt/dev_containers/code → Pod /workspace
 ```
 
 部署：
@@ -95,30 +81,40 @@ kubectl patch serviceaccount default \
 ```bash
 kubectl apply -f k8s/dev-containers.yml
 kubectl rollout status deployment/dev-containers
+kubectl get pv dev-containers-code-pv
+kubectl get pvc dev-containers-code
 kubectl get pod -l app.kubernetes.io/name=dev-containers
+kubectl get service dev-containers
 ```
 
-本地转发 SSH 端口：
+SSH 密码当前直接写在 `k8s/dev-containers.yml` 中：
 
-```bash
-kubectl port-forward service/dev-containers 2222:22
+```text
+dev_containers
 ```
 
-然后连接：
+连接方式：
 
 ```bash
-ssh -p 2222 root@127.0.0.1
+ssh -p 50022 root@EXTERNAL_IP
+```
+
+`EXTERNAL_IP` 从以下命令的 `EXTERNAL-IP` 字段获取：
+
+```bash
+kubectl get service dev-containers
 ```
 
 删除部署：
 
 ```bash
 kubectl delete -f k8s/dev-containers.yml
-kubectl delete secret dev-containers-ssh ghcr-credentials
 ```
 
-`hostPath` 适用于单节点或固定节点环境。在多节点集群中，建议将 `hostPath` 替换为 PVC。
+`PersistentVolume` 使用 `hostPath` 作为后端，因此仍然适合单节点或固定节点环境。`persistentVolumeReclaimPolicy: Retain` 表示删除 PVC 后，PV 和节点上的代码目录数据保留，不会自动删除。多节点集群建议替换为云盘、NFS、Longhorn、Ceph 等实际共享存储。
+
+`LoadBalancer` 是否能够获得公网 IP，取决于 Kubernetes 环境是否配置了云厂商 Load Balancer、MetalLB 或其他 LoadBalancer 实现。若 `EXTERNAL-IP` 长期为 `<pending>`，需要配置对应的 LoadBalancer 实现，或者临时改用 `NodePort`。
 
 ## 安全提示
 
-密码不会写进镜像或 Git 仓库。不要提交 `.env`、Secret YAML、`GHCR_TOKEN` 或真实 SSH key。挂载 `/var/run/docker.sock` 会让容器获得近似宿主机 root 权限，默认保持禁用。
+当前 Kubernetes 配置为了简单使用，将 SSH 密码以明文 `value` 写入 YAML，密码为 `dev_containers`。仅建议用于测试环境，生产环境应改回 Kubernetes Secret。不要将该端口直接暴露到不受信任的公网。挂载 `/var/run/docker.sock` 会让容器获得近似宿主机 root 权限，默认保持禁用。
