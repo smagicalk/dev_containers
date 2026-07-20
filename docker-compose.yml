@@ -1,0 +1,17 @@
+services:
+  devbox:
+    build:
+      context: .
+    image: debian13-devbox:latest
+    container_name: debian13-devbox
+    hostname: devbox
+    restart: unless-stopped
+    ports:
+      - "2222:22"
+    environment:
+      SSH_PASSWORD: "${SSH_PASSWORD:?Set SSH_PASSWORD in .env or the shell}"
+      # SSH_PUBLIC_KEY: "ssh-ed25519 AAAA..."
+    volumes:
+      - ./workspace:/workspace
+      # 如需操作宿主机 Docker，取消下一行注释；这等同于授予宿主机 root 权限。
+      # - /var/run/docker.sock:/var/run/docker.sock
