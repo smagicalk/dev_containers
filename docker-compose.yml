@@ -3,7 +3,7 @@ services:
     build:
       context: .
     image: debian13-devbox:latest
-    container_name: debian13-devbox
+    container_name: dev_containers
     hostname: devbox
     restart: unless-stopped
     ports:
